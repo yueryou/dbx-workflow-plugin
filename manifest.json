@@ -1,0 +1,89 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/plugin-sdk-v1/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "io.github.yueryou.workflow",
+  "name": "Workflow Manage",
+  "version": "0.1.0",
+  "publisher": "yueryou",
+  "description": "DBX workflow plugin: Self host workflow; User defined pipline task;",
+  "icon": "assets/plugin.svg",
+  "engines": {
+    "dbx": ">=0.5.68",
+    "host_api": "1"
+  },
+  "entrypoints": {
+    "backend": {
+      "executable": "bin/dbx-plugin-dbx-workflow-plugin"
+    },
+    "ui": {
+      "root": "ui",
+      "entry": "ui/index.html"
+    }
+  },
+  "contributions": [
+    {
+      "type": "connection-provider",
+      "id": "io.github.yueryou.workflow.connection",
+      "label": "Workflow Manage connection",
+      "icon": "assets/plugin.svg",
+      "database_type": "dbx-workflow-plugin",
+      "description": "Connection form contributed by Workflow Manage.",
+      "fields": [
+        {
+          "key": "display_name",
+          "label": "Connection name",
+          "type": "text",
+          "default": "Workflow Manage connection",
+          "binding": "name",
+          "required": true
+        },
+        {
+          "key": "host",
+          "label": "Host",
+          "type": "text",
+          "default": "localhost",
+          "binding": "host",
+          "required": true
+        },
+        {
+          "key": "port",
+          "label": "Port",
+          "type": "number",
+          "default": 0,
+          "binding": "port",
+          "required": true
+        }
+      ],
+      "workbench": "io.github.yueryou.workflow.workbench",
+      "capabilities": ["test", "connect", "disconnect"]
+    },
+    {
+      "type": "workbench",
+      "id": "io.github.yueryou.workflow.workbench",
+      "label": "Workflow Manage Workbench",
+      "description": "Sandboxed UI contributed by Workflow Manage.",
+      "icon": "assets/plugin.svg"
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "Workflow Manage",
+      "description": "DBX workflow plugin: Self host workflow; User defined pipline task;",
+      "contributions": {
+        "io.github.yueryou.workflow.connection": {
+          "label": "Workflow Manage 连接",
+          "description": "由插件声明的连接表单。",
+          "fields": {
+            "display_name": { "label": "连接名称" },
+            "host": { "label": "主机" },
+            "port": { "label": "端口" }
+          }
+        },
+        "io.github.yueryou.workflow.workbench": {
+          "label": "Workflow Manage 工作台",
+          "description": "由插件提供的沙箱工作台界面。"
+        }
+      }
+    }
+  }
+}
