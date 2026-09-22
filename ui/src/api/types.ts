@@ -87,8 +87,8 @@ export interface NodeResult {
   status: ExecutionStatus;
   started_at?: string;
   finished_at?: string;
-  output?: unknown;
-  error?: string;
+  output?: unknown | null;
+  error?: string | null;
   attempts: number;
 }
 
@@ -100,9 +100,9 @@ export interface Execution {
   trigger?: string;
   input?: unknown;
   node_results: NodeResult[];
-  error?: string;
+  error?: string | null;
   started_at: string;
-  finished_at?: string;
+  finished_at?: string | null;
   duration_ms: number;
 }
 
@@ -111,7 +111,7 @@ export interface ExecutionSummary {
   workflow_id: string;
   status: ExecutionStatus;
   started_at: string;
-  finished_at?: string;
+  finished_at?: string | null;
 }
 
 export interface ValidationResult {
