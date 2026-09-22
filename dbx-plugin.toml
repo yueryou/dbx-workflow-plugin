@@ -4,6 +4,12 @@ schema_version = 1
 language = "rust"
 directory = "backend"
 binary = "dbx-plugin-dbx-workflow-plugin"
+command = "cargo build --release"
+
+[frontend]
+language = "javascript"
+directory = "ui"
+command = "npm install && npm run build"
 
 [package]
-include = ["assets", "ui"]
+include = ["assets", "ui/dist"]
