@@ -52,13 +52,20 @@ impl WorkflowEngine {
         workflow_id: &str,
         execution_id: &str,
     ) -> Result<(), PluginError> {
-        // 1. 发送开始事件
+        // 1. 更新状态为 running
+        self.executions.update_status(
+            execution_id,
+            crate::models::execution::ExecutionStatus::Running,
+            None,
+        )?;
+
+        // 2. 发送开始事件
         self.emit("execution/started", json!({
             "executionId": execution_id,
             "workflowId": workflow_id,
         }))?;
 
-        // 2. 加载工作流
+        // 3. 加载工作流
         let workflow = match self.workflows.get_value(workflow_id) {
             Ok(wf) => wf,
             Err(e) => {
@@ -66,20 +73,28 @@ impl WorkflowEngine {
                     "executionId": execution_id,
                     "error": e.message.clone(),
                 }))?;
+                self.executions.update_status(
+                    execution_id,
+                    crate::models::execution::ExecutionStatus::Failed,
+                    Some(0),
+                )?;
                 return Err(e);
             }
         };
 
-        // 3. DAG 拓扑排序
+        // 4. DAG 拓扑排序
         let execution_order = self.topological_sort(&workflow)?;
 
-        // 4. 创建执行上下文
+        // 5. 创建执行上下文
         let mut ctx = WorkflowContext::new(
             workflow_id.to_string(),
             execution_id.to_string(),
         );
 
-        // 5. 按顺序执行节点
+        // 记录开始时间
+        let start_time = std::time::Instant::now();
+
+        // 6. 按顺序执行节点
         let nodes = workflow.get("nodes").and_then(|n| n.as_array());
         if let Some(nodes) = nodes {
             for node_id in &execution_order {
@@ -104,10 +119,28 @@ impl WorkflowEngine {
                     "nodeName": node_name,
                 }))?;
 
+                // 记录节点开始时间
+                let node_start = std::time::Instant::now();
+
                 // 执行节点
                 match self.execute_node(&node, &mut ctx) {
                     Ok(output) => {
                         ctx.set_node_output(node_id, output.clone());
+                        let node_duration = node_start.elapsed().as_millis() as i64;
+
+                        // 持久化节点结果
+                        let node_result = json!({
+                            "node_id": node_id,
+                            "status": "completed",
+                            "started_at": crate::util::now_iso(),
+                            "finished_at": crate::util::now_iso(),
+                            "duration_ms": node_duration,
+                            "output": output,
+                            "error": null,
+                            "attempts": 1,
+                        });
+                        let _ = self.executions.add_node_result(execution_id, node_id, &node_result);
+
                         self.emit("execution/nodeCompleted", json!({
                             "executionId": execution_id,
                             "nodeId": node_id,
@@ -117,6 +150,21 @@ impl WorkflowEngine {
                         }))?;
                     }
                     Err(e) => {
+                        let node_duration = node_start.elapsed().as_millis() as i64;
+
+                        // 持久化失败节点结果
+                        let node_result = json!({
+                            "node_id": node_id,
+                            "status": "failed",
+                            "started_at": crate::util::now_iso(),
+                            "finished_at": crate::util::now_iso(),
+                            "duration_ms": node_duration,
+                            "output": null,
+                            "error": e.message.clone(),
+                            "attempts": 1,
+                        });
+                        let _ = self.executions.add_node_result(execution_id, node_id, &node_result);
+
                         self.emit("execution/nodeFailed", json!({
                             "executionId": execution_id,
                             "nodeId": node_id,
@@ -128,17 +176,36 @@ impl WorkflowEngine {
                             "error": e.message.clone(),
                             "failedNodeId": node_id,
                         }))?;
+
+                        // 更新执行状态为 failed
+                        let _ = self.executions.update_status(
+                            execution_id,
+                            crate::models::execution::ExecutionStatus::Failed,
+                            Some(node_duration),
+                        );
+
                         return Err(e);
                     }
                 }
             }
         }
 
-        // 6. 发送完成事件
+        // 计算总耗时
+        let total_duration = start_time.elapsed().as_millis() as i64;
+
+        // 更新执行状态为 completed
+        self.executions.update_status(
+            execution_id,
+            crate::models::execution::ExecutionStatus::Completed,
+            Some(total_duration),
+        )?;
+
+        // 发送完成事件
         self.emit("execution/completed", json!({
             "executionId": execution_id,
             "status": "completed",
             "finishedAt": crate::util::now_iso(),
+            "durationMs": total_duration,
         }))?;
 
         Ok(())

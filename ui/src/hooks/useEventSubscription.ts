@@ -14,7 +14,6 @@ interface EventSubscription {
  */
 export function useEventSubscription() {
   const subscriptionsRef = useRef<EventSubscription[]>([]);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
    * Subscribe to execution events
@@ -24,24 +23,15 @@ export function useEventSubscription() {
     subscriptionsRef.current.push(subscription);
 
     // In real DBX mode, use the event system
-    // @ts-expect-error - DBX plugin may have event subscription API at runtime
-    if (typeof window !== 'undefined' && window.dbxPlugin?.on) {
-      const handleEvent = (event: ExecutionEvent) => {
-        if (event.executionId === executionId) {
-          onEvent(event);
+    if (typeof window !== 'undefined' && window.dbxPlugin?.onEvent) {
+      const handleEvent = (event: { method: string; params: unknown }) => {
+        const params = event.params as ExecutionEvent;
+        if (params.executionId === executionId) {
+          onEvent(params);
         }
       };
 
-      // @ts-expect-error - DBX plugin may have event subscription API at runtime
-      window.dbxPlugin.on('execution/nodeStarted', handleEvent as any);
-      // @ts-expect-error - DBX plugin may have event subscription API at runtime
-      window.dbxPlugin.on('execution/nodeCompleted', handleEvent as any);
-      // @ts-expect-error - DBX plugin may have event subscription API at runtime
-      window.dbxPlugin.on('execution/nodeFailed', handleEvent as any);
-      // @ts-expect-error - DBX plugin may have event subscription API at runtime
-      window.dbxPlugin.on('execution/completed', handleEvent as any);
-      // @ts-expect-error - DBX plugin may have event subscription API at runtime
-      window.dbxPlugin.on('execution/failed', handleEvent as any);
+      window.dbxPlugin.onEvent(handleEvent);
     }
 
     return () => {
@@ -69,9 +59,6 @@ export function useEventSubscription() {
   useEffect(() => {
     return () => {
       subscriptionsRef.current = [];
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
     };
   }, []);
 

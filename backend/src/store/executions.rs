@@ -150,6 +150,57 @@ impl ExecutionRepository {
         }))
     }
 
+    /// 更新执行状态
+    pub fn update_status(&self, id: &str, status: ExecutionStatus, duration_ms: Option<i64>) -> Result<(), PluginError> {
+        let path = self.path(id);
+        if !path.exists() {
+            return Err(PluginError::new(-32602, format!("Execution not found: {}", id)));
+        }
+
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+        let mut ex: Execution = serde_json::from_str(&content)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+
+        ex.status = status;
+        if let Some(dur) = duration_ms {
+            ex.duration_ms = dur;
+            ex.finished_at = Some(util::now_iso());
+        }
+
+        let content = serde_json::to_vec_pretty(&ex)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+        std::fs::write(&path, content)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// 添加节点执行结果
+    pub fn add_node_result(&self, id: &str, node_id: &str, result: &Value) -> Result<(), PluginError> {
+        let path = self.path(id);
+        if !path.exists() {
+            return Err(PluginError::new(-32602, format!("Execution not found: {}", id)));
+        }
+
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+        let mut ex: Execution = serde_json::from_str(&content)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+
+        // 添加节点结果
+        if let Some(node_result) = serde_json::from_value::<crate::models::execution::NodeResult>(result.clone()).ok() {
+            ex.node_results.push(node_result);
+        }
+
+        let content = serde_json::to_vec_pretty(&ex)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+        std::fs::write(&path, content)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+
+        Ok(())
+    }
+
     pub fn cancel(&self, params: &Value) -> Result<Value, PluginError> {
         let id = util::str_param(params, "id")?;
         let path = self.path(id);

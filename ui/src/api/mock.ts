@@ -351,8 +351,11 @@ export const mockApi = (() => {
     // === M2: New mock methods ===
 
     runExecution: async (workflowId: string): Promise<{ executionId: string; status: string }> => {
-      await delay(300);
+      await delay(200);
       const executions = loadFromStorage<Execution[]>(STORAGE_KEYS.executions, data.executions);
+      const workflows = loadFromStorage<Workflow[]>(STORAGE_KEYS.workflows, data.workflows);
+      const workflow = workflows.find((w) => w.id === workflowId);
+
       const executionId = `ex_${Date.now().toString(36)}`;
       const ex: Execution = {
         id: executionId,
@@ -368,24 +371,56 @@ export const mockApi = (() => {
       executions.unshift(ex);
       saveToStorage(STORAGE_KEYS.executions, executions);
 
-      // Simulate completion after a delay
-      setTimeout(() => {
+      // 模拟逐步执行每个节点
+      let nodeIndex = 0;
+      const nodes = workflow?.nodes || [];
+
+      const executeNextNode = () => {
+        if (nodeIndex >= nodes.length) {
+          // 所有节点执行完成
+          const currentExecs = loadFromStorage<Execution[]>(STORAGE_KEYS.executions, data.executions);
+          const exec = currentExecs.find((e) => e.id === executionId);
+          if (exec) {
+            exec.status = 'completed';
+            exec.finished_at = new Date().toISOString();
+            exec.duration_ms = (exec.finished_at && exec.started_at)
+              ? new Date(exec.finished_at).getTime() - new Date(exec.started_at).getTime()
+              : 0;
+            saveToStorage(STORAGE_KEYS.executions, currentExecs);
+          }
+          return;
+        }
+
+        const node = nodes[nodeIndex];
+        // 跳过 start/end 虚拟节点，但仍记录
+        const isVirtual = node.node_type === 'start' || node.node_type === 'end';
+        const nodeResult = {
+          node_id: node.id,
+          status: isVirtual ? 'completed' as const : (Math.random() > 0.05 ? 'completed' as const : 'failed' as const),
+          started_at: new Date().toISOString(),
+          finished_at: new Date().toISOString(),
+          output: isVirtual ? null : { simulated: true, nodeType: node.node_type },
+          error: null,
+          attempts: 1,
+        };
+
+        // 更新执行记录
         const currentExecs = loadFromStorage<Execution[]>(STORAGE_KEYS.executions, data.executions);
         const exec = currentExecs.find((e) => e.id === executionId);
         if (exec) {
-          exec.status = 'completed';
-          exec.finished_at = new Date().toISOString();
-          exec.duration_ms = 2500;
-          exec.node_results = [
-            { node_id: 'n1', status: 'completed', attempts: 1 },
-            { node_id: 'n2', status: 'completed', attempts: 1 },
-            { node_id: 'n3', status: 'completed', attempts: 1 },
-          ];
+          exec.node_results.push(nodeResult);
           saveToStorage(STORAGE_KEYS.executions, currentExecs);
         }
-      }, 2500);
 
-      return { executionId, status: 'pending' };
+        nodeIndex++;
+        // 每个节点 1-2.5 秒
+        setTimeout(executeNextNode, 1000 + Math.random() * 1500);
+      };
+
+      // 开始执行第一个节点
+      setTimeout(executeNextNode, 500);
+
+      return { executionId, status: 'running' };
     },
 
     transformSql: async (params: {
