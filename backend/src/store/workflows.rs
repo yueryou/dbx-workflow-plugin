@@ -56,6 +56,11 @@ impl WorkflowRepository {
 
     pub fn get(&self, params: &Value) -> Result<Value, PluginError> {
         let id = util::str_param(params, "id")?;
+        self.get_value(id)
+    }
+
+    /// 通过 ID 获取工作流（内部使用）
+    pub fn get_value(&self, id: &str) -> Result<Value, PluginError> {
         let path = self.path(id);
         if !path.exists() {
             return Err(PluginError::new(-32602, format!("Workflow not found: {}", id)));

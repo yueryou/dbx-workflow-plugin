@@ -1,6 +1,8 @@
+pub mod connections;
 pub mod executions;
 pub mod workflows;
 
+pub use connections::ConnectionRepository;
 pub use executions::ExecutionRepository;
 pub use workflows::WorkflowRepository;
 
@@ -19,6 +21,8 @@ impl FileStore {
         let root = base;
         std::fs::create_dir_all(root.join("workflows"))?;
         std::fs::create_dir_all(root.join("executions"))?;
+        std::fs::create_dir_all(root.join("schedules"))?;
+        std::fs::create_dir_all(root.join("connections"))?;
         Ok(Self { root })
     }
 
@@ -28,5 +32,13 @@ impl FileStore {
 
     pub fn executions_dir(&self) -> PathBuf {
         self.root.join("executions")
+    }
+
+    pub fn schedules_dir(&self) -> PathBuf {
+        self.root.join("schedules")
+    }
+
+    pub fn connections_dir(&self) -> PathBuf {
+        self.root.join("connections")
     }
 }

@@ -100,6 +100,56 @@ impl ExecutionRepository {
             .map_err(|e| PluginError::new(-32000, e.to_string()))?)
     }
 
+    /// 获取执行日志（节点级详细日志）
+    pub fn logs(&self, params: &Value) -> Result<Value, PluginError> {
+        let id = util::str_param(params, "id")?;
+        // 获取执行详情，包含 node_results
+        let path = self.path(id);
+        if !path.exists() {
+            return Err(PluginError::new(-32602, format!("Execution not found: {}", id)));
+        }
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+        let ex: Execution = serde_json::from_str(&content)
+            .map_err(|e| PluginError::new(-32000, e.to_string()))?;
+
+        // 构建日志列表
+        let logs: Vec<Value> = ex.node_results.iter().map(|nr| {
+            let duration_ms = match (&nr.started_at, &nr.finished_at) {
+                (Some(start), Some(end)) => {
+                    if let (Ok(s), Ok(e)) = (
+                        chrono::DateTime::parse_from_rfc3339(start),
+                        chrono::DateTime::parse_from_rfc3339(end),
+                    ) {
+                        (e - s).num_milliseconds()
+                    } else {
+                        0
+                    }
+                }
+                _ => 0,
+            };
+            json!({
+                "nodeId": &nr.node_id,
+                "status": &nr.status,
+                "startedAt": &nr.started_at,
+                "finishedAt": &nr.finished_at,
+                "durationMs": duration_ms,
+                "output": &nr.output,
+                "error": &nr.error,
+                "attempts": nr.attempts,
+            })
+        }).collect();
+
+        Ok(json!({
+            "executionId": &ex.id,
+            "workflowId": &ex.workflow_id,
+            "status": ex.status,
+            "startedAt": ex.started_at,
+            "finishedAt": ex.finished_at,
+            "logs": logs,
+        }))
+    }
+
     pub fn cancel(&self, params: &Value) -> Result<Value, PluginError> {
         let id = util::str_param(params, "id")?;
         let path = self.path(id);

@@ -13,10 +13,10 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 uuid = { version = "1", features = ["v4"] }
 directories = "5"
+regex = "1"
+cron = "0.12"
+ureq = { version = "2", features = ["json"] }
 
-# Keep plugin binaries close to the host app's size: default release settings
-# leave ~20MB of symbols and unoptimized generic code in an OpenDAL-sized backend.
-# panic stays "unwind" so the sidecar protocol can report panics as errors.
 [profile.release]
 strip = true
 lto = true

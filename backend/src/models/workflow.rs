@@ -13,6 +13,11 @@ pub enum NodeType {
     Transform,
     Approval,
     SubWorkflow,
+    // M2/M3 新增节点类型
+    FileRead,      // "file_read" - 读取本地 SQL 文件
+    SqlTransform,  // "sql_transform" - SQL 方言转换
+    SqlExecute,    // "sql_execute" - SQL 执行
+    Notify,        // "notify" - 通知节点
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
